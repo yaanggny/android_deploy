@@ -80,6 +80,7 @@ public:
         int hpad, wpad;
         float scale = 1.f;
         preproc(img_rgb, imgPreproc, hpad, wpad);
+        printf("preprocessed img: %d x %d\n", imgPreproc.rows, imgPreproc.cols);
         if (imgW > imgH)
         {
             scale = (float)inW / imgW;
@@ -88,9 +89,6 @@ public:
         {
             scale = (float)inH / imgH;
         }
-        
-
-        printf("preprocessed img: %d x %d\n", imgPreproc.rows, imgPreproc.cols);
         ncnn::Mat imgIn = ncnn::Mat::from_pixels_resize(imgPreproc.data, ncnn::Mat::PIXEL_RGB, inW, inH, inW, inH);
         imgIn.substract_mean_normalize(meanVals, stdVals);
 
@@ -102,7 +100,7 @@ public:
 
         std::vector<Object> proposals;
 
-        float prob_threshold = 0.25f;
+        float prob_threshold = 0.3f;
         float nms_threshold = 0.45f;
 
         // stride 8
@@ -111,13 +109,6 @@ public:
             ex.extract("output", out);
 
             ncnn::Mat anchors(6);
-            // anchors[0] = 12.f;
-            // anchors[1] = 16.f;
-            // anchors[2] = 19.f;
-            // anchors[3] = 36.f;
-            // anchors[4] = 40.f;
-            // anchors[5] = 28.f;
-
             anchors[0] = 10.f;
             anchors[1] = 13.f;
             anchors[2] = 16.f;
@@ -137,13 +128,6 @@ public:
             ex.extract("781", out);
 
             ncnn::Mat anchors(6);
-            // anchors[0] = 36.f;
-            // anchors[1] = 75.f;
-            // anchors[2] = 76.f;
-            // anchors[3] = 55.f;
-            // anchors[4] = 72.f;
-            // anchors[5] = 146.f;
-
             anchors[0] = 30.f;
             anchors[1] = 61.f;
             anchors[2] = 62.f;
@@ -163,13 +147,6 @@ public:
             ex.extract("801", out);
 
             ncnn::Mat anchors(6);
-            // anchors[0] = 142.f;
-            // anchors[1] = 110.f;
-            // anchors[2] = 192.f;
-            // anchors[3] = 243.f;
-            // anchors[4] = 459.f;
-            // anchors[5] = 401.f;
-
             anchors[0] = 116.f;
             anchors[1] = 90.f;
             anchors[2] = 156.f;
@@ -194,26 +171,26 @@ public:
         printf("detected_object num = %d\n", count);
 
         objects.resize(count);
-        for (int i = 0; i < count; i++) 
+        for (int i = 0; i < count; i++)
         {
             objects[i] = proposals[picked[i]];
 
             // adjust offset to original unpadded
-            float x0 = (objects[i].rect.x - (wpad / 2)) / scale;
-            float y0 = (objects[i].rect.y - (hpad / 2)) / scale;
-            float x1 = (objects[i].rect.x + objects[i].rect.width - (wpad / 2)) / scale;
-            float y1 = (objects[i].rect.y + objects[i].rect.height - (hpad / 2)) / scale;
+            float x0 = (objects[i].x - (wpad / 2)) / scale;
+            float y0 = (objects[i].y - (hpad / 2)) / scale;
+            float x1 = (objects[i].x + objects[i].w - (wpad / 2)) / scale;
+            float y1 = (objects[i].y + objects[i].h - (hpad / 2)) / scale;
 
             // clip
-            x0 = std::max(std::min(x0, (float) (imgW - 1)), 0.f);
-            y0 = std::max(std::min(y0, (float) (imgH - 1)), 0.f);
-            x1 = std::max(std::min(x1, (float) (imgW - 1)), 0.f);
-            y1 = std::max(std::min(y1, (float) (imgH - 1)), 0.f);
+            x0 = std::max(std::min(x0, (float)(imgW - 1)), 0.f);
+            y0 = std::max(std::min(y0, (float)(imgH - 1)), 0.f);
+            x1 = std::max(std::min(x1, (float)(imgW - 1)), 0.f);
+            y1 = std::max(std::min(y1, (float)(imgH - 1)), 0.f);
 
-            objects[i].rect.x = x0;
-            objects[i].rect.y = y0;
-            objects[i].rect.width = x1 - x0;
-            objects[i].rect.height = y1 - y0;
+            objects[i].x = x0;
+            objects[i].y = y0;
+            objects[i].w = x1 - x0;
+            objects[i].h = y1 - y0;
         }
     }
 
@@ -224,7 +201,7 @@ public:
         color_index = 0;
         for (const auto& obj : bbox)
         {
-            cv::Rect rect(obj.rect.x, obj.rect.y, obj.rect.width, obj.rect.height);
+            cv::Rect rect(obj.x, obj.y, obj.w, obj.h);
             draw_bbox(img, rect, obj.label, obj.prob);
             color_index++;
         }

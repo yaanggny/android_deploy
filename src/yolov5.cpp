@@ -1,5 +1,7 @@
 #include "yolov5.h"
 
+#include <gpu.h>
+
 static ncnn::UnlockedPoolAllocator g_blob_pool_allocator;
 static ncnn::PoolAllocator g_workspace_pool_allocator;
 
@@ -7,31 +9,25 @@ DEFINE_LAYER_CREATOR(YoloV5Focus)
 
 YoloV5::YoloV5(const std::string& model_path_noext, int _model_size, bool use_gpu)
 {
-    ///*
     net.clear();
-    // blob_pool_allocator.clear();
-    // workspace_pool_allocator.clear();
 
     ncnn::set_cpu_powersave(2);
     ncnn::set_omp_num_threads(ncnn::get_big_cpu_count());
 
-    net.opt = ncnn::Option();
+    ncnn::Option opt;
+    // opt.lightmode = true;
+    // opt.use_packing_layout = true;
+    opt.num_threads = ncnn::get_big_cpu_count();
+    if(use_gpu)
+    {
 #if NCNN_VULKAN
-    net.opt.use_vulkan_compute = use_gpu;
+        bool hasGPU = ncnn::get_gpu_count() > 0;  // get_gpu_count is available vulkan version ncnn only
+        opt.use_vulkan_compute = use_gpu && hasGPU;
 #endif
-    net.opt.num_threads = ncnn::get_big_cpu_count();
-    net.opt.blob_allocator = &g_blob_pool_allocator;
-    net.opt.workspace_allocator = &g_workspace_pool_allocator;
-    //*/
-
-    // {
-    //     ncnn::Option opt;
-    //     opt.lightmode = true;
-    //     opt.num_threads = 4;
-    //     opt.blob_allocator = &g_blob_pool_allocator;
-    //     opt.workspace_allocator = &g_workspace_pool_allocator;
-    //     opt.use_packing_layout = true;
-    // }
+        opt.blob_allocator = &g_blob_pool_allocator;
+        opt.workspace_allocator = &g_workspace_pool_allocator;
+    }
+    net.opt = opt;
 
     net.register_custom_layer("YoloV5Focus", YoloV5Focus_layer_creator);
 
@@ -52,8 +48,7 @@ YoloV5::YoloV5(const std::string& model_path_noext, int _model_size, bool use_gp
 
     stdVals[0] = 1.f / 255.f;
     stdVals[1] = 1.f / 255.f;
-    stdVals[2] = 1.f / 255.f;
-    
+    stdVals[2] = 1.f / 255.f;    
 }
 
 void printSize(const cv::Mat& img, const char* ext)

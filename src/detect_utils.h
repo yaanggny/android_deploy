@@ -8,7 +8,10 @@
 
 struct Object
 {
-    cv::Rect_<float> rect;
+    float x;
+    float y;
+    float w;
+    float h;
     int label;
     float prob;
 };

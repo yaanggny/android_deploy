@@ -4,8 +4,8 @@ project(yolox)
 
 set(CMAKE_COLOR_DIAGNOSTICS ON)
 
-# set(ncnn_DIR ${CMAKE_SOURCE_DIR}/ncnn-20201218-android-vulkan/${ANDROID_ABI}/lib/cmake/ncnn)
-set(ncnn_DIR "/mnt/e/android/ncnn-20250503-android-shared/arm64-v8a/lib/cmake/ncnn")
+# set(ncnn_DIR "/mnt/e/android/ncnn-20250503-android-shared/arm64-v8a/lib/cmake/ncnn")
+set(ncnn_DIR "/mnt/e/android/ncnn-20250503-android-vulkan/arm64-v8a/lib/cmake/ncnn")
 set(OpenCV_DIR /home/gy/dev/packages/install/opencv-mobile-3.4.20-android/sdk/native/jni/abi-arm64-v8a)
 
 message(STATUS "OpenCV_DIR=${OpenCV_DIR}")
