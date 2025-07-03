@@ -3,9 +3,17 @@
 // 2020 / 10 / 2
 //
 #include "NanoDet.h"
+#include <fmt/printf.h>
+#include <fmt/format.h>
+#include <fmt/ranges.h>
 
-bool NanoDet::hasGPU = true;
-NanoDet* NanoDet::detector = nullptr;
+#include <cpu.h>
+
+namespace nanodet
+{
+
+// bool NanoDet::hasGPU = true;
+// NanoDet* NanoDet::detector = nullptr;
 
 inline float fast_exp(float x)
 {
@@ -61,20 +69,38 @@ static void generate_grid_center_priors(const int input_height, const int input_
     }
 }
 
-NanoDet::NanoDet(const std::string& modelname_noext, bool useGPU) {
-    this->Net = new ncnn::Net();
-    hasGPU = ncnn::get_gpu_count() > 0;
-    this->Net->opt.use_vulkan_compute = false; //hasGPU && useGPU;  // gpu
-    this->Net->opt.use_fp16_arithmetic = true;
-    this->Net->opt.use_fp16_packed = true;
-    this->Net->opt.use_fp16_storage = true;
-    this->Net->load_param((modelname_noext + ".param").c_str());
-    this->Net->load_model((modelname_noext + ".bin").c_str());
+NanoDet::NanoDet(const std::string& modelname_noext, bool useGPU) 
+{
+    blob_pool_allocator.set_size_compare_ratio(0.f);
+    workspace_pool_allocator.set_size_compare_ratio(0.f);
+
+    blob_pool_allocator.clear();
+    workspace_pool_allocator.clear();
+
+    m_net = new ncnn::Net();
+    bool hasGPU = ncnn::get_gpu_count() > 0;
+    useGPU = useGPU && hasGPU;
+    m_net->opt.use_fp16_arithmetic = true;
+    m_net->opt.use_fp16_packed = true;
+    m_net->opt.use_fp16_storage = true;
+    
+    m_net->opt.num_threads = ncnn::get_big_cpu_count();
+#ifdef NCNN_VULKAN
+    m_net->opt.use_vulkan_compute = useGPU;  // gpu
+    if (useGPU)
+    {
+        m_net->opt.blob_allocator = &blob_pool_allocator;
+        m_net->opt.workspace_allocator = &workspace_pool_allocator;
+    }
+#endif
+    
+    m_net->load_param((modelname_noext + ".param").c_str());
+    m_net->load_model((modelname_noext + ".bin").c_str());
 }
 
 NanoDet::~NanoDet()
 {
-    delete this->Net;
+    delete m_net;
 }
 
 void NanoDet::preprocess(const cv::Mat& img_rgb, ncnn::Mat& in)
@@ -88,47 +114,48 @@ void NanoDet::preprocess(const cv::Mat& img_rgb, ncnn::Mat& in)
     in.substract_mean_normalize(mean_vals, norm_vals);
 }
 
-std::vector<BoxInfo> NanoDet::detect(const cv::Mat& img_rgb, float score_threshold, float nms_threshold) {
+void NanoDet::setModelConfig(int inputSize, const std::vector<int>& strides, const std::string& inputNode, const std::string& outputNode)
+{
+    this->input_size[0] = inputSize;
+    this->input_size[1] = inputSize;
+    this->strides = strides;
+
+    m_config.inputSize = inputSize;
+    m_config.strides = strides;
+    m_config.inputNode = inputNode;
+    m_config.outputNode = outputNode;
+}
+
+void NanoDet::setModelConfig(const ModelConfig& config)
+{
+    this->input_size[0] = config.inputSize;
+    this->input_size[1] = config.inputSize;
+    this->strides = config.strides;
+
+    m_config = config;
+    m_config.printSelf();
+}
+
+std::vector<BoxInfo> NanoDet::detect(const cv::Mat& img_rgb, float score_threshold, float nms_threshold)
+{
+    fmt::print("NanoDet::detect: input_size: {}x{}  reg_max={}  strides: {}\n", input_size[0], input_size[1], reg_max, strides);
+
     cv::Size img_size = img_rgb.size();
     float width_ratio = (float) img_size.width / (float) this->input_size[1];
     float height_ratio = (float) img_size.height / (float) this->input_size[0];
-
-    printf("input img size: %d x %d\n", img_size.height, img_size.width);
-
+    
     ncnn::Mat input;
     this->preprocess(img_rgb, input);
-    printf("preprocessed img size: %d x %d x %d\n", input.h, input.w, input.c);
+    printf("input img size: %d x %d -->  %d x %d x %d\n", img_size.height, img_size.width, input.h, input.w, input.c);
 
+    auto ex = m_net->create_extractor();
+    ex.input(m_config.inputNode.c_str(), input);  // "data"
 
-    auto ex = this->Net->create_extractor();
-    // ex.set_light_mode(true);
-    // ex.set_num_threads(4);
-
-    ncnn::Option opt;
-    opt.lightmode = true;
-    opt.num_threads = 4;
-    // opt.blob_allocator = &g_blob_pool_allocator;
-    // opt.workspace_allocator = &g_workspace_pool_allocator;
-    opt.use_packing_layout = true;
-    // use vulkan compute
-    hasGPU = ncnn::get_gpu_count() > 0;
-    hasGPU = false;
-    if (hasGPU)
-    {
-        printf("use vulkan compute\n");
-        opt.use_vulkan_compute = true;
-    }
-    
-    Net->opt = opt;
-
-    //ex.set_vulkan_compute(hasGPU);
-
-    ex.input("data", input);
     std::vector<std::vector<BoxInfo>> results;
     results.resize(this->num_class);
 
     ncnn::Mat out;
-    ex.extract("output", out);
+    ex.extract(m_config.outputNode.c_str(), out);   // "output"
     printf("out: %d %d %d\n", out.w, out.h, out.c);
 
     // generate center priors in format of (x, y, stride)
@@ -242,4 +269,6 @@ void NanoDet::nms(std::vector<BoxInfo>& input_boxes, float NMS_THRESH)
             }
         }
     }
+}
+
 }

@@ -12,8 +12,8 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-#ifndef NANODET_H
-#define NANODET_H
+#ifndef NANODET__H
+#define NANODET__H
 
 #include <opencv2/core/core.hpp>
 

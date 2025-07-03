@@ -12,7 +12,7 @@
 // CONDITIONS OF ANY KIND, either express or implied. See the License for the
 // specific language governing permissions and limitations under the License.
 
-#include "nanodet.h"
+#include "nanodet_.h"
 
 #include <opencv2/core/core.hpp>
 #include <opencv2/imgproc/imgproc.hpp>
@@ -223,18 +223,18 @@ int NanoDet::load(const char* modeltype, int _target_size, const float* _mean_va
 
     nanodet.opt = ncnn::Option();
 
+    nanodet.opt.num_threads = ncnn::get_big_cpu_count();
 #ifdef NCNN_VULKAN
     nanodet.opt.use_vulkan_compute = use_gpu;
     printf("use_vulkan_compute = %d\n", (int)use_gpu);
     printf("use_vulkan_compute = %d\n", (int)nanodet.opt.use_vulkan_compute);
-#endif
-
-    nanodet.opt.num_threads = ncnn::get_big_cpu_count();
     if (use_gpu)
     {
         nanodet.opt.blob_allocator = &blob_pool_allocator;
         nanodet.opt.workspace_allocator = &workspace_pool_allocator;
     }
+#endif
+
 
     char parampath[256];
     char modelpath[256];
@@ -370,7 +370,7 @@ int NanoDet::detect(const cv::Mat& rgb, std::vector<ObjectNano>& objects, float 
     // sort all proposals by score from highest to lowest
     tm.start();
     qsort_descent_inplace(proposals);
-    tm.getDt("qsort_descent_inplace");
+    // tm.getDt("qsort_descent_inplace");
     // apply nms with nms_threshold
     std::vector<int> picked;
     nms_sorted_bboxes(proposals, picked, nms_threshold);

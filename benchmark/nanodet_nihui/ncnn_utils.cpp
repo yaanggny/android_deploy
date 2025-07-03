@@ -17,7 +17,8 @@
 
 // #include <jni.h>
 
-#include "nanodet.h"
+#include "ncnn_utils.h"
+#include "io_img.h"
 
 #include <string>
 #include <vector>
@@ -27,6 +28,13 @@
 
 // #include <opencv2/core/core.hpp>
 // #include <opencv2/imgproc/imgproc.hpp>
+
+#include <fmt/format.h>
+#include <fmt/printf.h>
+
+#include <timer.h>
+
+#include <opencv2/core.hpp>
 
 #if __ARM_NEON
 #include <arm_neon.h>
@@ -182,3 +190,97 @@ void loadModel(const char* model_dir, int modelid, int cpugpu, NanoDet& detector
     }
 }
 
+static void loadModel(const char* model_dir, const std::string& modelname, bool use_gpu, int targetSize, NanoDet& detector)
+{
+    float mean[3] = { 103.53f, 116.28f, 123.675f};
+    float norm[3] = { 1.f / 57.375f, 1.f / 57.12f, 1.f / 58.395f};
+    std::string modelPrefix = std::string(model_dir) + "/" + modelname;
+    detector.load(modelPrefix.c_str(), targetSize, mean, norm, use_gpu);
+}
+
+
+static void test_model(const std::string& modelname, const cv::Mat& bgr, int nloops, int use_gpu, int targetSize)
+{
+    // int8
+    NanoDet detector;
+    const char* model_dir = "/data/local/tmp/ncnn/weights";
+    // std::string modelname = "nanodet-m-int8_dowload";
+    BenchmarkTimer tm(modelname.c_str(), 5, 1);
+    tm.start();
+    loadModel(model_dir, modelname, use_gpu, targetSize, detector);
+    tm.getDt("init");
+
+    cv::Mat bgr_cpy;
+
+    for (int i = 0; i < nloops; i++)
+    {
+        tm.start();
+        std::vector<ObjectNano> bboxes2;
+        detector.detect(bgr, bboxes2);
+        tm.stop();
+
+        bgr_cpy = bgr.clone();
+        detector.draw(bgr_cpy, bboxes2);
+        std::string fo = fmt::format("result_{}_{}.jpg", modelname, i);
+        saveImg(fo, bgr_cpy);
+    }
+}
+
+
+void test_bench_nanodet(const cv::Mat& bgr, int nloops, int use_gpu)
+{
+    cv::Mat bgr_cpy;
+    /*{
+        NanoDet detector;
+        const char* model_dir = "/data/local/tmp/ncnn/weights";
+        BenchmarkTimer tm("nanodet-m-f32", 5, 1);
+        tm.start();
+        loadModel(model_dir, 0, use_gpu, detector);
+        tm.getDt("nano_init");
+
+        for (int i = 0; i < nloops; i++)
+        {
+            tm.start();
+                std::vector<ObjectNano> bboxes2;
+            detector.detect(bgr, bboxes2);
+            tm.stop();
+
+            bgr_cpy = bgr.clone();
+            detector.draw(bgr_cpy, bboxes2);
+            fo = "result_nano_nihui.jpg";
+            // saveImg(fo, bgr_cpy);
+        }
+    }*/
+
+    // int8
+    {
+        NanoDet detector;
+        const char* model_dir = "/data/local/tmp/ncnn/weights";
+        std::string modelname = "nanodet-m-int8";
+        BenchmarkTimer tm(modelname.c_str(), 5, 1);
+        tm.start();
+        loadModel(model_dir, 2, use_gpu, detector);
+        tm.getDt("nano_init");
+
+        for (int i = 0; i < nloops; i++)
+        {
+            tm.start();
+            std::vector<ObjectNano> bboxes2;
+            detector.detect(bgr, bboxes2);
+            tm.stop();
+
+            bgr_cpy = bgr.clone();
+            detector.draw(bgr_cpy, bboxes2);
+            // fo = "result_nano_nihui-int8.jpg";
+            std::string fo = fmt::format("result_{}_nihui_{}.jpg", modelname, i);
+            saveImg(fo, bgr_cpy);
+        }
+    }
+
+    // int8
+    test_model("nanodet_m-int8_download", bgr, nloops, use_gpu, 320);
+
+    // self export
+    // f32
+    // test_model("nanodet.torchscript.ncnn", bgr, nloops, use_gpu, false);
+}

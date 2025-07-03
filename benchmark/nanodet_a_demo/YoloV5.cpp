@@ -5,6 +5,9 @@
 #include "YoloV5.h"
 #include "cpu.h"
 
+namespace nanodet
+{
+
 bool YoloV5::hasGPU = true;
 YoloV5 *YoloV5::detector = nullptr;
 
@@ -37,14 +40,13 @@ std::vector<BoxInfo> YoloV5::detect(const cv::Mat& img_rgb, float threshold, flo
     // ncnn::Mat in_net = ncnn::Mat::from_android_bitmap_resize(env, image, ncnn::Mat::PIXEL_RGBA2RGB, input_size / 2,
     //                                                          input_size / 2);
     cv::Size img_size = img_rgb.size();
-    printf("img shape: %d x %d\n", img_size.height, img_size.width);
     ncnn::Mat in_net = ncnn::Mat::from_pixels_resize((unsigned char*)img_rgb.data, ncnn::Mat::PIXEL_RGB, img_rgb.cols, img_rgb.rows, input_size, input_size);
     
     float norm[3] = {1 / 255.f, 1 / 255.f, 1 / 255.f};
     float mean[3] = {0, 0, 0};
     in_net.substract_mean_normalize(mean, norm);
-
-    printf("preprocessed img size: %d x %d x %d\n", in_net.h, in_net.w, in_net.c);
+    
+    printf("img shape: %d x %d  ->  %d x %d x %d\n", img_size.height, img_size.width, in_net.h, in_net.w, in_net.c);
 
     ncnn::Option opt;
     // opt.lightmode = true;
@@ -161,4 +163,6 @@ void YoloV5::nms(std::vector<BoxInfo> &input_boxes, float NMS_THRESH) {
             }
         }
     }
+}
+
 }

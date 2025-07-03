@@ -12,6 +12,9 @@
 #include <string>
 #include <vector>
 
+namespace nanodet
+{
+    
 namespace yolocv {
     typedef struct {
         int width;
@@ -111,5 +114,6 @@ public:
     static bool hasGPU;
 };
 
+} // namespace name
 
 #endif //YOLOV5_H
