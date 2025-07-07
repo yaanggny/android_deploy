@@ -109,7 +109,7 @@ public:
         
         // __android_log_print(ANDROID_LOG_DEBUG, "Benchmark",
         printf(
-            "[%s] runs: %d  avg: %.2f ms  max: %.2f ms  "
+            "[%25s] runs: %d  avg: %.2f ms  max: %.2f ms  "
             "med: %.2f ms  std: %.2f ms  FPS: %.1f\n",
             m_tag,
             static_cast<int>(m_times.size()),
